@@ -7,6 +7,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { PubSub } from 'graphql-subscriptions';
 import { join } from 'path';
 import depthLimit from 'graphql-depth-limit';
+import { fieldExtensionsEstimator, getComplexity, simpleEstimator } from 'graphql-query-complexity';
 import { GraphQLError } from 'graphql';
 
 import { Patient } from '../patients/entities/patient.entity';
@@ -30,8 +31,6 @@ import { TenantsResolver } from './resolvers/tenants.resolver';
 import { RealtimeEventsResolver } from './resolvers/realtime-events.resolver';
 
 // Services from other modules
-import { RecordsModule } from '../records/records.module';
-import { AccessControlModule } from '../access-control/access-control.module';
 import { AuthModule } from '../auth/auth.module';
 import { AuthTokenService } from '../auth/services/auth-token.service';
 import { SessionManagementService } from '../auth/services/session-management.service';
@@ -72,6 +71,41 @@ import { GraphqlPubSubService } from '../pubsub/services/graphql-pubsub.service'
 
           // Depth limit to prevent malicious deeply nested queries
           validationRules: [depthLimit(7)],
+          plugins: [
+            {
+              async requestDidStart() {
+                return {
+                  async didResolveOperation(requestContext: any) {
+                    const complexity = getComplexity({
+                      schema: requestContext.schema,
+                      operationName: requestContext.request.operationName,
+                      query: requestContext.document,
+                      variables: requestContext.request.variables,
+                      estimators: [
+                        fieldExtensionsEstimator(),
+                        simpleEstimator({ defaultComplexity: 1 }),
+                      ],
+                    });
+
+                    const complexityThreshold = 150;
+                    if (complexity > complexityThreshold) {
+                      throw new GraphQLError(
+                        `Query complexity ${complexity} exceeds maximum allowed complexity of ${complexityThreshold}. ` +
+                          `Reduce nested selection depth, page results, or trim requested fields.`,
+                        {
+                          extensions: {
+                            code: 'GRAPHQL_QUERY_COMPLEXITY_EXCEEDED',
+                            complexity,
+                            threshold: complexityThreshold,
+                          },
+                        },
+                      );
+                    }
+                  },
+                };
+              },
+            },
+          ],
 
           // graphql-ws (recommended transport) for GraphQL subscriptions
           subscriptions: {
