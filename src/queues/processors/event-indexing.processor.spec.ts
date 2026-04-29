@@ -1,11 +1,20 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { EventIndexingProcessor } from './event-indexing.processor';
-import { QUEUE_NAMES } from '../queue.constants';
 import { Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { RecordEventStoreService } from '../../records/services/record-event-store.service';
+import { RecordEventType } from '../../records/entities/record-event.entity';
+
+jest.mock('../queue-payload.util', () => ({
+  verifyQueuePayload: jest.fn(),
+}));
 
 describe('EventIndexingProcessor', () => {
   let processor: EventIndexingProcessor;
   let mockJob: any;
+  let recordEventStore: { append: jest.Mock };
+  let eventEmitter: { emit: jest.Mock };
 
   beforeEach(async () => {
     mockJob = {
@@ -16,19 +25,33 @@ describe('EventIndexingProcessor', () => {
         data: {
           blockHeight: 12345,
           eventSequence: 1,
+          recordId: 'rec-123',
+          txHash: 'tx-abc',
           patientId: 'pat-123',
           cid: 'Qm...',
         },
         correlationId: 'corr-event-001',
         traceContext: {},
+        _sig: 'test-sig',
       },
       attemptsMade: 0,
       opts: { attempts: 3 },
       progress: jest.fn(),
     };
 
+    recordEventStore = { append: jest.fn().mockResolvedValue(undefined) };
+    eventEmitter = { emit: jest.fn() };
+
     const module: TestingModule = await Test.createTestingModule({
-      providers: [EventIndexingProcessor],
+      providers: [
+        EventIndexingProcessor,
+        {
+          provide: ConfigService,
+          useValue: { getOrThrow: jest.fn().mockReturnValue('secret') },
+        },
+        { provide: RecordEventStoreService, useValue: recordEventStore },
+        { provide: EventEmitter2, useValue: eventEmitter },
+      ],
     }).compile();
 
     processor = module.get<EventIndexingProcessor>(EventIndexingProcessor);
@@ -60,6 +83,12 @@ describe('EventIndexingProcessor', () => {
       expect(result.timestamp).toBeDefined();
       expect(result.blockHeight).toBe(12345);
       expect(result.eventSequence).toBe(1);
+
+      expect(recordEventStore.append).toHaveBeenCalledWith(
+        'rec-123',
+        RecordEventType.RECORD_STELLAR_ANCHORED,
+        expect.objectContaining({ stellarTxHash: 'tx-abc' }),
+      );
     });
 
     it('should track progress during event indexing', async () => {
@@ -86,6 +115,11 @@ describe('EventIndexingProcessor', () => {
           status: 'success',
           eventType: 'ContractEventAccessRevoked',
         }),
+      );
+
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        'chain.access_revoked',
+        expect.objectContaining({ recordId: 'rec-789' }),
       );
     });
 
@@ -152,30 +186,6 @@ describe('EventIndexingProcessor', () => {
         expect(result.eventType).toBe(eventType);
         expect(result.status).toBe('success');
       }
-    });
-  });
-
-  describe('Contract event indexing timing', () => {
-    it('should process AccessRevoked events with longer simulated delay', async () => {
-      mockJob.data.eventType = 'ContractEventAccessRevoked';
-
-      const startTime = Date.now();
-      await processor.process(mockJob);
-      const duration = Date.now() - startTime;
-
-      // AccessRevoked events have 1500ms simulated delay
-      expect(duration).toBeGreaterThanOrEqual(1500);
-    });
-
-    it('should process other events with standard simulated delay', async () => {
-      mockJob.data.eventType = 'ContractEventAnchorRecord';
-
-      const startTime = Date.now();
-      await processor.process(mockJob);
-      const duration = Date.now() - startTime;
-
-      // Other events have 1000ms simulated delay
-      expect(duration).toBeGreaterThanOrEqual(1000);
     });
   });
 

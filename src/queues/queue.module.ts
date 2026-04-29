@@ -14,10 +14,16 @@ import { ContractWritesProcessor } from './processors/contract-writes.processor'
 import { EventIndexingProcessor } from './processors/event-indexing.processor';
 import { BlockchainModule } from '../blockchain/blockchain.module';
 import { QueueEventsListener } from './queue-events.listener';
+import { RecordsModule } from '../records/records.module';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 
 @Module({
   imports: [
     BlockchainModule,
+    // Needed by EventIndexingProcessor to emit internal domain events in worker mode
+    EventEmitterModule.forRoot(),
+    // Needed by EventIndexingProcessor to persist per-record event streams
+    RecordsModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
