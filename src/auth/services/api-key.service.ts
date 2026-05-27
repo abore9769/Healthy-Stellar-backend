@@ -234,6 +234,16 @@ export class ApiKeyService {
   }
 
   /**
+   * Record the last used IP address for an API key
+   */
+  async recordLastUsedIp(id: string, ip: string): Promise<void> {
+    await this.apiKeyRepository.update(id, {
+      lastUsedByIp: ip,
+      lastUsedAt: new Date(),
+    });
+  }
+
+  /**
    * Check if an API key has any of the required scopes
    */
   hasAnyScope(apiKey: ApiKey, requiredScopes: ApiKeyScope[]): boolean {
