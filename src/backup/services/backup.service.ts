@@ -2,14 +2,75 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { spawn } from 'child_process';
 import * as crypto from 'crypto';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { BackupLog, BackupType, BackupStatus } from '../entities/backup-log.entity';
 
-const execAsync = promisify(exec);
+/** Strict allowlist validators for database connection env variables. */
+const HOSTNAME_RE = /^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$/;
+const IDENTIFIER_RE = /^[a-zA-Z_][a-zA-Z0-9_]{0,62}$/;
+
+function validateDbHost(value: string): string {
+  // Allow plain hostnames, FQDNs, and IPv4 addresses
+  const ipv4Re = /^(\d{1,3}\.){3}\d{1,3}$/;
+  if (!HOSTNAME_RE.test(value) && !ipv4Re.test(value)) {
+    throw new Error(`DB_HOST contains invalid characters: "${value}"`);
+  }
+  return value;
+}
+
+function validateDbPort(value: string): string {
+  const port = parseInt(value, 10);
+  if (isNaN(port) || port < 1 || port > 65535 || String(port) !== value.trim()) {
+    throw new Error(`DB_PORT is not a valid port number: "${value}"`);
+  }
+  return value;
+}
+
+function validateDbIdentifier(value: string, envVar: string): string {
+  if (!IDENTIFIER_RE.test(value)) {
+    throw new Error(`${envVar} contains invalid characters: "${value}"`);
+  }
+  return value;
+}
+
+/**
+ * Runs a command safely using spawn (no shell) and resolves/rejects based on
+ * the process exit code.  stdout/stderr are forwarded to the provided logger.
+ */
+function spawnAsync(
+  command: string,
+  args: string[],
+  options: { env?: NodeJS.ProcessEnv; logger?: Logger } = {},
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      shell: false, // never invoke a shell
+      env: options.env ?? process.env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
+    child.stdout?.on('data', (data: Buffer) => {
+      options.logger?.debug(`[${command}] ${data.toString().trim()}`);
+    });
+
+    child.stderr?.on('data', (data: Buffer) => {
+      options.logger?.debug(`[${command} stderr] ${data.toString().trim()}`);
+    });
+
+    child.on('error', reject);
+
+    child.on('close', (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`${command} exited with code ${code}`));
+      }
+    });
+  });
+}
 
 @Injectable()
 export class BackupService {
@@ -167,34 +228,58 @@ export class BackupService {
   }
 
   private async backupDatabase(outputPath: string): Promise<void> {
-    const dbHost = process.env.DB_HOST || 'localhost';
-    const dbPort = process.env.DB_PORT || '5432';
-    const dbName = process.env.DB_NAME || 'healthy_stellar';
-    const dbUser = process.env.DB_USERNAME || 'medical_user';
+    const dbHost = validateDbHost(process.env.DB_HOST || 'localhost');
+    const dbPort = validateDbPort(process.env.DB_PORT || '5432');
+    const dbName = validateDbIdentifier(process.env.DB_NAME || 'healthy_stellar', 'DB_NAME');
+    const dbUser = validateDbIdentifier(process.env.DB_USERNAME || 'medical_user', 'DB_USERNAME');
 
-    const command = `pg_dump -h ${dbHost} -p ${dbPort} -U ${dbUser} -d ${dbName} \
-      --format=custom --verbose --clean --no-owner --no-privileges \
-      --file=${outputPath}.pgdump`;
-
-    await execAsync(command, {
-      env: { ...process.env, PGPASSWORD: process.env.DB_PASSWORD },
-    });
+    await spawnAsync(
+      'pg_dump',
+      [
+        '-h', dbHost,
+        '-p', dbPort,
+        '-U', dbUser,
+        '-d', dbName,
+        '--format=custom',
+        '--verbose',
+        '--clean',
+        '--no-owner',
+        '--no-privileges',
+        `--file=${outputPath}.pgdump`,
+      ],
+      {
+        env: { ...process.env, PGPASSWORD: process.env.DB_PASSWORD },
+        logger: this.logger,
+      },
+    );
   }
 
-  private async backupDatabaseIncremental(outputPath: string, sinceDate: Date): Promise<void> {
-    const dbHost = process.env.DB_HOST || 'localhost';
-    const dbPort = process.env.DB_PORT || '5432';
-    const dbName = process.env.DB_NAME || 'healthy_stellar';
-    const dbUser = process.env.DB_USERNAME || 'medical_user';
+  private async backupDatabaseIncremental(outputPath: string, _sinceDate: Date): Promise<void> {
+    const dbHost = validateDbHost(process.env.DB_HOST || 'localhost');
+    const dbPort = validateDbPort(process.env.DB_PORT || '5432');
+    const dbName = validateDbIdentifier(process.env.DB_NAME || 'healthy_stellar', 'DB_NAME');
+    const dbUser = validateDbIdentifier(process.env.DB_USERNAME || 'medical_user', 'DB_USERNAME');
 
     // Export only changed data using WAL archiving or timestamp-based queries
-    const command = `pg_dump -h ${dbHost} -p ${dbPort} -U ${dbUser} -d ${dbName} \
-      --format=custom --verbose --clean --no-owner --no-privileges \
-      --file=${outputPath}.pgdump`;
-
-    await execAsync(command, {
-      env: { ...process.env, PGPASSWORD: process.env.DB_PASSWORD },
-    });
+    await spawnAsync(
+      'pg_dump',
+      [
+        '-h', dbHost,
+        '-p', dbPort,
+        '-U', dbUser,
+        '-d', dbName,
+        '--format=custom',
+        '--verbose',
+        '--clean',
+        '--no-owner',
+        '--no-privileges',
+        `--file=${outputPath}.pgdump`,
+      ],
+      {
+        env: { ...process.env, PGPASSWORD: process.env.DB_PASSWORD },
+        logger: this.logger,
+      },
+    );
   }
 
   private async encryptBackup(inputPath: string): Promise<string> {
@@ -224,7 +309,7 @@ export class BackupService {
 
   private async compressBackup(inputPath: string): Promise<string> {
     const outputPath = `${inputPath}.gz`;
-    await execAsync(`gzip -9 ${inputPath}`);
+    await spawnAsync('gzip', ['-9', inputPath], { logger: this.logger });
     return outputPath;
   }
 
