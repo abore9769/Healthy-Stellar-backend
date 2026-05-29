@@ -9,6 +9,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { I18nModule, AcceptLanguageResolver } from 'nestjs-i18n';
 import * as path from 'path';
 import { AuthModule } from './auth/auth.module';
+import { OidcModule } from './OAuth2/oidc.module';
 import { AdminModule } from './admin/admin.module';
 import { BillingModule } from './billing/billing.module';
 import { MedicalRecordsModule } from './medical-records/medical-records.module';
@@ -104,6 +105,7 @@ import { OperatorRunbookModule } from './operator-runbook/operator-runbook.modul
     CommonModule,
     I18nAppModule,
     AuthModule,
+    OidcModule,
     AdminModule,
     BillingModule,
     MedicalRecordsModule,
