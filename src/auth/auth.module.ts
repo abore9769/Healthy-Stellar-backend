@@ -42,6 +42,7 @@ import { RefreshTokenStoreService } from './services/refresh-token-store.service
 import { SessionCleanupTask } from './tasks/session-cleanup.task';
 import { SecretRotationService } from './services/secret-rotation.service';
 import { SecretRotationController } from './controllers/secret-rotation.controller';
+import { SessionRevocationService } from './services/session-revocation.service';
 
 @Module({
   imports: [
@@ -71,6 +72,7 @@ import { SecretRotationController } from './controllers/secret-rotation.controll
     ProviderDirectoryService,
     SecretRotationService,
     RefreshTokenStoreService,
+    SessionRevocationService,
     ApiKeyStrategy,
     JwtAuthGuard,
     OptionalJwtAuthGuard,
@@ -92,6 +94,7 @@ import { SecretRotationController } from './controllers/secret-rotation.controll
     ProviderDirectoryService,
     SecretRotationService,
     RefreshTokenStoreService,
+    SessionRevocationService,
     JwtAuthGuard,
     OptionalJwtAuthGuard,
     RolesGuard,

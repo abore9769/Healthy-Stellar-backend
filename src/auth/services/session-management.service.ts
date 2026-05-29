@@ -8,6 +8,7 @@ import { Repository, LessThan, MoreThan } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { SessionEntity } from '../entities/session.entity';
 import { User } from '../entities/user.entity';
+import { SessionRevocationService } from './session-revocation.service';
 
 export interface SessionInfo {
   id: string;
@@ -27,6 +28,7 @@ export class SessionManagementService {
     @InjectRepository(User)
     private userRepository: Repository<User>,
     private configService: ConfigService,
+    private sessionRevocationService: SessionRevocationService,
   ) {}
 
   /** SHA-256 hash a token — the raw value is never persisted. */
@@ -161,6 +163,9 @@ export class SessionManagementService {
     session.isActive = false;
     session.revokedAt = new Date();
     await this.sessionRepository.save(session);
+
+    // Propagate revocation to open WebSocket connections immediately.
+    await this.sessionRevocationService.notifySessionRevoked(sessionId);
   }
 
   /**
@@ -180,6 +185,9 @@ export class SessionManagementService {
     }
 
     await this.sessionRepository.save(sessions);
+
+    // Propagate revocation to open WebSocket connections immediately.
+    await this.sessionRevocationService.notifyUserSessionsRevoked(userId);
   }
 
   /**

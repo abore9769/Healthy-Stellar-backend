@@ -35,6 +35,7 @@ import { RecordsModule } from '../records/records.module';
 import { UsersModule } from '../users/users.module';
 import { GdprModule } from '../gdpr/gdpr.module';
 import { DevicesModule } from '../devices/devices.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
@@ -63,6 +64,7 @@ import { DevicesModule } from '../devices/devices.module';
     UsersModule,
     GdprModule,
     DevicesModule,
+    AuthModule,
   ],
 
   providers: [

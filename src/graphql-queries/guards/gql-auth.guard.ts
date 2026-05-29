@@ -9,8 +9,9 @@ import {
 } from '@nestjs/common';
 import { GqlExecutionContext } from '@nestjs/graphql';
 import { Reflector } from '@nestjs/core';
-import { JwtService } from '@nestjs/jwt';
 import { UserRole } from '../enums';
+import { AuthTokenService } from '../../auth/services/auth-token.service';
+import { SessionManagementService } from '../../auth/services/session-management.service';
 
 export const ROLES_KEY = 'roles';
 export const Roles = (...roles: UserRole[]) => SetMetadata(ROLES_KEY, roles);
@@ -24,7 +25,10 @@ export const CurrentUser = createParamDecorator(
 
 @Injectable()
 export class GqlAuthGuard implements CanActivate {
-  constructor(private readonly jwtService: JwtService) {}
+  constructor(
+    private readonly authTokenService: AuthTokenService,
+    private readonly sessionManagementService: SessionManagementService,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const ctx = GqlExecutionContext.create(context);
@@ -36,13 +40,18 @@ export class GqlAuthGuard implements CanActivate {
     }
 
     const token = authHeader.slice(7);
-    try {
-      const payload = await this.jwtService.verifyAsync(token);
-      req.user = payload;
-      return true;
-    } catch {
+    const payload = this.authTokenService.verifyAccessToken(token);
+    if (!payload) {
       throw new UnauthorizedException('Token is invalid or expired');
     }
+
+    const isValid = await this.sessionManagementService.isSessionValid(payload.sessionId);
+    if (!isValid) {
+      throw new UnauthorizedException('Session expired or revoked');
+    }
+
+    req.user = payload;
+    return true;
   }
 }
 

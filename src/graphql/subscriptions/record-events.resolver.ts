@@ -1,4 +1,5 @@
-import { Resolver, Subscription, Args } from '@nestjs/graphql';
+import { Args, Context, Resolver, Subscription } from '@nestjs/graphql';
+import { GraphQLError } from 'graphql';
 import { MedicalRecord } from '../types/medical-record.type';
 import { AccessGrant } from '../types/access-grant.type';
 import { GraphqlPubSubService } from '../../pubsub/services/graphql-pubsub.service';
@@ -15,8 +16,11 @@ export class RecordEventsResolver {
   })
   async onNewRecord(
     @Args('patientAddress') patientAddress: string,
+    @Context() ctx: any,
   ): Promise<AsyncIterator<MedicalRecord>> {
-    return this.pubSub.recordUploadedIterator(patientAddress);
+    const { sessionId, userId } = this.getSessionContext(ctx);
+    this.assertAuthenticated(userId);
+    return this.pubSub.recordUploadedIterator(patientAddress, undefined, sessionId, userId);
   }
 
   @Subscription(() => AccessGrant, {
@@ -27,7 +31,26 @@ export class RecordEventsResolver {
   })
   async onAccessChanged(
     @Args('patientAddress') patientAddress: string,
+    @Context() ctx: any,
   ): Promise<AsyncIterator<AccessGrant>> {
-    return this.pubSub.accessGrantedIterator(patientAddress);
+    const { sessionId, userId } = this.getSessionContext(ctx);
+    this.assertAuthenticated(userId);
+    return this.pubSub.accessGrantedIterator(patientAddress, undefined, sessionId, userId);
+  }
+
+  private assertAuthenticated(userId: string | undefined): void {
+    if (!userId) {
+      throw new GraphQLError('Subscription authentication required', {
+        extensions: { code: 'UNAUTHENTICATED' },
+      });
+    }
+  }
+
+  private getSessionContext(ctx: any): { sessionId: string | undefined; userId: string | undefined } {
+    const user = ctx?.user ?? ctx?.req?.user ?? ctx?.extra?.user;
+    return {
+      sessionId: user?.sessionId,
+      userId: user?.userId ?? user?.id,
+    };
   }
 }

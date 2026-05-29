@@ -3,7 +3,6 @@ import { GraphQLModule } from '@nestjs/graphql';
 import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { JwtModule } from '@nestjs/jwt';
 import { PubSub } from 'graphql-subscriptions';
 import { join } from 'path';
 import depthLimit from 'graphql-depth-limit';
@@ -29,6 +28,8 @@ import { UsersResolver } from './resolvers/users.resolver';
 import { AuditLogsResolver } from './resolvers/audit-logs.resolver';
 import { TenantsResolver } from './resolvers/tenants.resolver';
 import { RealtimeEventsResolver } from './resolvers/realtime-events.resolver';
+import { PUB_SUB } from './resolvers/subscriptions.resolver';
+import { RecordEventsResolver } from './subscriptions/record-events.resolver';
 
 // Services from other modules
 import { AuthModule } from '../auth/auth.module';
@@ -40,14 +41,6 @@ import { GraphqlPubSubService } from '../pubsub/services/graphql-pubsub.service'
 @Module({
   imports: [
     TypeOrmModule.forFeature([Patient, Record, AccessGrant, User]),
-    JwtModule.registerAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (cfg: ConfigService) => ({
-        secret: cfg.get('JWT_SECRET', 'secret'),
-        signOptions: { expiresIn: cfg.get('JWT_EXPIRES_IN', '7d') },
-      }),
-    }),
     RecordsModule,
     AccessControlModule,
     AuthModule,
@@ -187,6 +180,7 @@ import { GraphqlPubSubService } from '../pubsub/services/graphql-pubsub.service'
     AuditLogsResolver,
     TenantsResolver,
     RealtimeEventsResolver,
+    RecordEventsResolver,
   ],
   exports: [GqlAuthGuard, GqlRolesGuard, PUB_SUB],
 })
