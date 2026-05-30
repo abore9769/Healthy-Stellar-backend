@@ -38,6 +38,8 @@ import { AuthTokenService } from '../auth/services/auth-token.service';
 import { SessionManagementService } from '../auth/services/session-management.service';
 import { PubSubModule } from '../pubsub/pubsub.module';
 import { GraphqlPubSubService } from '../pubsub/services/graphql-pubsub.service';
+import { AuditModule } from '../common/audit/audit.module';
+import { AuditLogService } from '../common/services/audit-log.service';
 
 @Module({
   imports: [
@@ -46,15 +48,17 @@ import { GraphqlPubSubService } from '../pubsub/services/graphql-pubsub.service'
     AccessControlModule,
     AuthModule,
     PubSubModule,
+    AuditModule,
     GraphQLModule.forRootAsync<ApolloDriverConfig>({
       driver: ApolloDriver,
-      imports: [ConfigModule, AuthModule, PubSubModule],
-      inject: [ConfigService, AuthTokenService, SessionManagementService, GraphqlPubSubService],
+      imports: [ConfigModule, AuthModule, PubSubModule, AuditModule],
+      inject: [ConfigService, AuthTokenService, SessionManagementService, GraphqlPubSubService, AuditLogService],
       useFactory: (
         config: ConfigService,
         authTokenService: AuthTokenService,
         sessionManagementService: SessionManagementService,
         graphqlPubSubService: GraphqlPubSubService,
+        auditLogService: AuditLogService,
       ) => {
         const isProd = config.get<string>('NODE_ENV') === 'production';
         return {
@@ -105,47 +109,130 @@ import { GraphqlPubSubService } from '../pubsub/services/graphql-pubsub.service'
           subscriptions: {
             'graphql-ws': {
               onConnect: async (ctx: any) => {
-                const token = extractWsToken(ctx.connectionParams);
-                if (!token) {
-                  throw new GraphQLError('Unauthorized: missing token', {
-                    extensions: { code: 'UNAUTHENTICATED' },
-                  });
-                }
+                const clientIp = ctx.extra?.clientIp || ctx.extra?.request?.ip || 'unknown';
 
-                const payload = authTokenService.verifyAccessToken(token);
-                if (!payload) {
-                  throw new GraphQLError('Unauthorized: invalid token', {
-                    extensions: { code: 'UNAUTHENTICATED' },
-                  });
-                }
-
-                const isSessionValid = await sessionManagementService.isSessionValid(payload.sessionId);
-                if (!isSessionValid) {
-                  throw new GraphQLError('Session expired or revoked', {
-                    extensions: { code: 'UNAUTHENTICATED' },
-                  });
-                }
-
-                await sessionManagementService.updateSessionActivity(payload.sessionId);
-
-                const connectionId = graphqlPubSubService.generateConnectionId();
                 try {
-                  await graphqlPubSubService.registerConnection(payload.userId, connectionId);
-                } catch {
-                  throw new GraphQLError('Forbidden: subscription connection limit reached', {
-                    extensions: { code: 'FORBIDDEN' },
+                  const token = extractWsToken(ctx.connectionParams);
+                  if (!token) {
+                    await auditLogService.log({
+                      entityType: 'GraphQLSubscription',
+                      entityId: 'unknown',
+                      action: 'CONNECTION_FAILED',
+                      userId: 'anonymous',
+                      changes: { reason: 'missing_token' },
+                      metadata: {
+                        clientIp,
+                        reason: 'Unauthorized: missing token',
+                      },
+                    });
+                    throw new GraphQLError('Unauthorized: missing token', {
+                      extensions: { code: 'UNAUTHENTICATED' },
+                    });
+                  }
+
+                  const payload = authTokenService.verifyAccessToken(token);
+                  if (!payload) {
+                    await auditLogService.log({
+                      entityType: 'GraphQLSubscription',
+                      entityId: 'unknown',
+                      action: 'CONNECTION_FAILED',
+                      userId: 'anonymous',
+                      changes: { reason: 'invalid_token' },
+                      metadata: {
+                        clientIp,
+                        reason: 'Unauthorized: invalid token',
+                      },
+                    });
+                    throw new GraphQLError('Unauthorized: invalid token', {
+                      extensions: { code: 'UNAUTHENTICATED' },
+                    });
+                  }
+
+                  const isSessionValid = await sessionManagementService.isSessionValid(payload.sessionId);
+                  if (!isSessionValid) {
+                    await auditLogService.log({
+                      entityType: 'GraphQLSubscription',
+                      entityId: payload.userId,
+                      action: 'CONNECTION_FAILED',
+                      userId: payload.userId,
+                      changes: { reason: 'session_expired' },
+                      metadata: {
+                        clientIp,
+                        reason: 'Session expired or revoked',
+                      },
+                    });
+                    throw new GraphQLError('Session expired or revoked', {
+                      extensions: { code: 'UNAUTHENTICATED' },
+                    });
+                  }
+
+                  await sessionManagementService.updateSessionActivity(payload.sessionId);
+
+                  const connectionId = graphqlPubSubService.generateConnectionId();
+                  try {
+                    await graphqlPubSubService.registerConnection(payload.userId, connectionId);
+                  } catch (error) {
+                    await auditLogService.log({
+                      entityType: 'GraphQLSubscription',
+                      entityId: payload.userId,
+                      action: 'CONNECTION_FAILED',
+                      userId: payload.userId,
+                      changes: { reason: 'connection_limit_reached' },
+                      metadata: {
+                        clientIp,
+                        reason: 'Subscription connection limit reached',
+                      },
+                    });
+                    throw new GraphQLError('Forbidden: subscription connection limit reached', {
+                      extensions: { code: 'FORBIDDEN' },
+                    });
+                  }
+
+                  // Log successful connection
+                  await auditLogService.log({
+                    entityType: 'GraphQLSubscription',
+                    entityId: connectionId,
+                    action: 'CONNECTED',
+                    userId: payload.userId,
+                    changes: { connectionId },
+                    metadata: {
+                      clientIp,
+                    },
+                  });
+
+                  ctx.extra.user = payload;
+                  ctx.extra.connectionId = connectionId;
+                  ctx.extra.connectionParams = ctx.connectionParams ?? {};
+                } catch (error) {
+                  // Re-throw GraphQL errors
+                  if (error instanceof GraphQLError) {
+                    throw error;
+                  }
+                  // Wrap other errors
+                  throw new GraphQLError('Internal server error', {
+                    extensions: { code: 'INTERNAL_ERROR' },
                   });
                 }
-
-                ctx.extra.user = payload;
-                ctx.extra.connectionId = connectionId;
-                ctx.extra.connectionParams = ctx.connectionParams ?? {};
               },
               onDisconnect: async (ctx: any) => {
                 const userId = ctx?.extra?.user?.userId;
                 const connectionId = ctx?.extra?.connectionId;
                 if (userId && connectionId) {
                   await graphqlPubSubService.unregisterConnection(userId, connectionId);
+
+                  // Log disconnection
+                  try {
+                    await auditLogService.log({
+                      entityType: 'GraphQLSubscription',
+                      entityId: connectionId,
+                      action: 'DISCONNECTED',
+                      userId,
+                      changes: { connectionId },
+                      metadata: {},
+                    });
+                  } catch (error) {
+                    // Silently fail audit logging to avoid blocking disconnect
+                  }
                 }
               },
             },
