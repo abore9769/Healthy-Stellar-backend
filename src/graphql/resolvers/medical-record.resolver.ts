@@ -30,6 +30,8 @@ export class MedicalRecordResolver {
   constructor(
     private readonly medicalRecordsService: MedicalRecordsService,
     private readonly dataloaderService: DataloaderService,
+    @InjectRepository(RecordEntity)
+    private readonly recordRepo: Repository<RecordEntity>,
   ) {}
 
   @Query(() => MedicalRecord, { nullable: true })
@@ -112,5 +114,18 @@ export class MedicalRecordResolver {
     @Context() ctx: { patientLoader: DataLoader<string, Patient> },
   ): Promise<Patient | null> {
     return ctx.patientLoader.load(record.patientId);
+  }
+
+  private toGqlType(r: RecordEntity, uploadedBy: string): MedicalRecord {
+    return {
+      id: r.id,
+      patientId: r.patientId,
+      cid: r.cid,
+      recordType: r.recordType as string,
+      stellarTxHash: r.stellarTxHash,
+      uploadedBy,
+      createdAt: r.createdAt,
+      updatedAt: r.createdAt,
+    };
   }
 }
