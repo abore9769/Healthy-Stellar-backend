@@ -35,6 +35,24 @@ export class FhirService {
       case 'Consent':
         resource = this.mapperService.mapConsentToFhir(entity);
         break;
+      case 'Observation':
+        resource = this.mapperService.mapObservationToFhir(entity);
+        break;
+      case 'MedicationAdministration':
+        resource = this.mapperService.mapMedicationAdministrationToFhir(entity);
+        break;
+      case 'Encounter':
+        resource = this.mapperService.mapEncounterToFhir(entity);
+        break;
+      case 'DiagnosticReport':
+        resource = this.mapperService.mapDiagnosticReportToFhir(entity);
+        break;
+      case 'Condition':
+        resource = this.mapperService.mapConditionToFhir(entity);
+        break;
+      case 'Procedure':
+        resource = this.mapperService.mapProcedureToFhir(entity);
+        break;
       default:
         throw new Error(`Unsupported resource type: ${resourceType}`);
     }
@@ -55,6 +73,18 @@ export class FhirService {
         return this.mapperService.mapProvenanceFromFhir(resource);
       case 'Consent':
         return this.mapperService.mapConsentFromFhir(resource);
+      case 'Observation':
+        return this.mapperService.mapObservationFromFhir(resource);
+      case 'MedicationAdministration':
+        return this.mapperService.mapMedicationAdministrationFromFhir(resource);
+      case 'Encounter':
+        return this.mapperService.mapEncounterFromFhir(resource);
+      case 'DiagnosticReport':
+        return this.mapperService.mapDiagnosticReportFromFhir(resource);
+      case 'Condition':
+        return this.mapperService.mapConditionFromFhir(resource);
+      case 'Procedure':
+        return this.mapperService.mapProcedureFromFhir(resource);
       default:
         throw new Error(`Unsupported resource type: ${resource.resourceType}`);
     }
@@ -304,8 +334,5 @@ export class FhirService {
   getProvenance(target?: string): any[] {
     // TODO: Fetch from database
     return [];
-  }
-}
-
   }
 }

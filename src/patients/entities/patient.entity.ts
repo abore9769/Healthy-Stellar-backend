@@ -12,6 +12,24 @@ import {
   NotificationPreferences,
 } from '../types/notification-preferences.type';
 
+export enum PatientSex {
+  MALE = 'male',
+  FEMALE = 'female',
+  OTHER = 'other',
+  UNKNOWN = 'unknown',
+}
+
+export enum PatientBloodGroup {
+  A_PLUS = 'A+',
+  A_MINUS = 'A-',
+  B_PLUS = 'B+',
+  B_MINUS = 'B-',
+  AB_PLUS = 'AB+',
+  AB_MINUS = 'AB-',
+  O_PLUS = 'O+',
+  O_MINUS = 'O-',
+}
+
 @Entity('patients')
 export class Patient {
   /**
@@ -42,8 +60,12 @@ export class Patient {
   @Column({ type: 'date' })
   dateOfBirth: string;
 
-  @Column()
-  sex: 'male' | 'female' | 'other' | 'unknown';
+  @Column({
+    type: 'enum',
+    enum: PatientSex,
+    default: PatientSex.UNKNOWN,
+  })
+  sex: PatientSex;
 
   @Column({ nullable: true })
   genderIdentity?: string;
@@ -53,8 +75,12 @@ export class Patient {
    * Medical Demographics
    * -----------------------------
    */
-  @Column({ nullable: true })
-  bloodGroup?: 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-';
+  @Column({
+    type: 'enum',
+    enum: PatientBloodGroup,
+    nullable: true,
+  })
+  bloodGroup?: PatientBloodGroup;
 
   @Column('json', { nullable: true })
   knownAllergies?: string[];
@@ -83,7 +109,7 @@ export class Patient {
   email?: string;
 
   @Column('json', { nullable: true })
-  address?: string;
+  address?: any;
 
   @Column({ default: false })
   isPhoneVerified: boolean;
