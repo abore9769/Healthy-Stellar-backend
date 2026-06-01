@@ -9,6 +9,8 @@ import {
   Query,
   Req,
   UseGuards,
+  DefaultValuePipe,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
@@ -128,9 +130,9 @@ export class RunbookController {
   @ApiQuery({ name: 'limit', required: false, type: Number })
   async getExecutionHistory(
     @Param('id', ParseUUIDPipe) id: string,
-    @Query('limit') limit?: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit = 20,
   ) {
-    return this.runbookService.getExecutionHistory(id, limit ? Number(limit) : 20);
+    return this.runbookService.getExecutionHistory(id, limit);
   }
 
   @Get(':runbookId/executions/:executionId')

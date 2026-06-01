@@ -74,21 +74,13 @@ import { IdempotencyInterceptor } from './idempotency/idempotency.interceptor';
 import { DlqModule } from './dlq/dlq.module';
 import { OperatorRunbookModule } from './operator-runbook/operator-runbook.module';
 import { IncidentModule } from './incident/incident.module';
-import { BullModule } from '@nestjs/bullmq';
-import { AuthModule } from './auth/auth.module';
-
-@Module({
-  imports: [
-    BullModule.forRoot({
-      connection: {
-        host: process.env.REDIS_HOST ?? 'localhost',
-        port: Number(process.env.REDIS_PORT ?? 6379),
-      },
-    }),
-    AuthModule,
-    // … all your existing imports stay here
-  ],
-})
+import { PiiRedactionInterceptor } from './common/interceptors/pii-redaction.interceptor';
+import { PaginationInterceptor } from './common/interceptors/pagination.interceptor';
+import { CqrsModule } from '@nestjs/cqrs';
+import { ResearchExportModule } from './research-export/research-export.module';
+import { ReconciliationModule } from './reconciliation/reconciliation.module';
+import { FeatureFlagModule } from './feature-flags/feature-flag.module';
+import { ProjectionsModule } from './projections/projections.module';
 
 @Module({
   imports: [
@@ -161,16 +153,13 @@ import { AuthModule } from './auth/auth.module';
     ProjectionsModule,
     CqrsModule,
     ProviderPatientModule,
- feat/data-consistency-checker
     ConsistencyCheckerModule,
-
     WebhooksModule,
     IdempotencyModule,
     DlqModule,
     OperatorRunbookModule,
     IncidentModule,
     EventEmitterModule.forRoot(),
- main
   ],
   controllers: [AppController],
   providers: [
@@ -179,6 +168,10 @@ import { AuthModule } from './auth/auth.module';
     {
       provide: APP_INTERCEPTOR,
       useClass: PiiRedactionInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: PaginationInterceptor,
     },
     {
       provide: APP_INTERCEPTOR,

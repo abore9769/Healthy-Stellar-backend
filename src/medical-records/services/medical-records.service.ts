@@ -217,10 +217,13 @@ export class MedicalRecordsService {
       startDate,
       endDate,
       page = 1,
-      limit = 10,
+      pageSize,
+      limit,
       sortBy = 'createdAt',
       sortOrder = 'DESC',
     } = searchDto;
+
+    const pageSizeValue = pageSize ?? limit ?? 20;
 
     const queryBuilder = this.medicalRecordRepository.createQueryBuilder('record');
 
@@ -259,8 +262,8 @@ export class MedicalRecordsService {
 
     queryBuilder
       .orderBy(`record.${sortBy}`, sortOrder)
-      .skip((page - 1) * limit)
-      .take(limit);
+      .skip((page - 1) * pageSizeValue)
+      .take(pageSizeValue);
 
     const [data, total] = await queryBuilder.getManyAndCount();
 
@@ -268,7 +271,7 @@ export class MedicalRecordsService {
       data,
       total,
       page,
-      limit,
+      limit: pageSizeValue,
     };
   }
 

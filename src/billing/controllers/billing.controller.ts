@@ -9,6 +9,8 @@ import {
   Query,
   HttpCode,
   HttpStatus,
+  DefaultValuePipe,
+  ParseIntPipe,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -119,8 +121,8 @@ export class BillingController {
   })
   async findByPatientId(
     @Param('patientId') patientId: string,
-    @Query('page') page?: number,
-    @Query('limit') limit?: number,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page = 1,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit = 20,
   ) {
     return this.billingService.findByPatientId(patientId, { page, limit });
   }

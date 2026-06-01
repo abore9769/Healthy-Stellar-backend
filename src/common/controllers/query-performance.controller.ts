@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Query, UseGuards, DefaultValuePipe, ParseIntPipe } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { QueryPerformanceMonitor } from '../services/query-performance-monitor.service';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
@@ -16,8 +16,10 @@ export class QueryPerformanceController {
   @Roles('admin', 'system_admin')
   @ApiOperation({ summary: 'Get slow queries from pg_stat_statements' })
   @ApiResponse({ status: 200, description: 'List of slow queries' })
-  async getSlowQueries(@Query('limit') limit?: number) {
-    return this.monitor.getSlowQueries(limit || 10);
+  async getSlowQueries(
+    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit = 10,
+  ) {
+    return this.monitor.getSlowQueries(limit);
   }
 
   @Post('reset-stats')

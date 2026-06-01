@@ -8,6 +8,8 @@ import {
   UseGuards,
   Req,
   ParseUUIDPipe,
+  ParseIntPipe,
+  DefaultValuePipe,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
@@ -46,14 +48,14 @@ export class DlqController {
   list(
     @Query('queueName') queueName?: string,
     @Query('status') status?: DlqJobStatus,
-    @Query('limit') limit?: string,
-    @Query('offset') offset?: string,
+    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit = 50,
+    @Query('offset', new DefaultValuePipe(0), ParseIntPipe) offset = 0,
   ) {
     const opts: DlqListOptions = {
       queueName,
       status,
-      limit: limit ? parseInt(limit, 10) : undefined,
-      offset: offset ? parseInt(offset, 10) : undefined,
+      limit,
+      offset,
     };
     return this.dlqService.list(opts);
   }

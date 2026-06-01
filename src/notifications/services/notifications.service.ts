@@ -141,6 +141,17 @@ export class NotificationsService {
     );
   }
 
+  async sendProviderEmailNotification(
+    providerId: string,
+    subject: string,
+    message: string,
+    preferredLanguage = 'en',
+  ): Promise<void> {
+    this.logger.log(
+      `Email notification queued for provider ${providerId} [lang=${preferredLanguage}]: ${subject} - ${message}`,
+    );
+  }
+
   async sendEmail(
     to: string,
     subject: string,
