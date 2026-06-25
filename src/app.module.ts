@@ -10,6 +10,7 @@ import { I18nModule, AcceptLanguageResolver } from 'nestjs-i18n';
 import * as path from 'path';
 import { AuthModule } from './auth/auth.module';
 import { OidcModule } from './OAuth2/oidc.module';
+import { SecurityModule } from './security/security.module';
 import { AdminModule } from './admin/admin.module';
 import { BillingModule } from './billing/billing.module';
 import { MedicalRecordsModule } from './medical-records/medical-records.module';
@@ -48,6 +49,7 @@ import { TenantInterceptor } from './tenant/interceptors/tenant.interceptor';
 import { DataResidencyInterceptor } from './common/interceptors/data-residency.interceptor';
 import { JobsModule } from './jobs/jobs.module';
 import { DataRetentionModule } from './data-retention/data-retention.module';
+import { DataResidencyModule } from './data-residency/data-residency.module';
 import { GraphqlModule } from './graphql/graphql.module';
 import { VersioningModule } from './versioning/versioning.module';
 import { LedgerReconciliationModule } from './ledger-reconciliation/ledger-reconciliation.module';
@@ -109,6 +111,7 @@ import { PiiRedactionInterceptor } from './common/interceptors/pii-redaction.int
     I18nAppModule,
     AuthModule,
     OidcModule,
+    SecurityModule,
     AdminModule,
     BillingModule,
     MedicalRecordsModule,
@@ -136,6 +139,7 @@ import { PiiRedactionInterceptor } from './common/interceptors/pii-redaction.int
     TenantConfigModule,
     AnalyticsModule,
     GdprModule,
+    DataResidencyModule,
     ResearchExportModule,
     ReconciliationModule,
     GraphqlModule,

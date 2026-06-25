@@ -80,6 +80,38 @@ npm run start:dev
 
 Copy `.env.example` to `.env`. Key sections:
 
+### Data residency and multi-region routing
+
+The backend now supports region-aware tenant database routing. Each tenant can declare a residency region and, when `strictDataResidency` is enabled, requests are rejected with `403 Forbidden` if they attempt to access data outside the configured region.
+
+Example environment variables:
+
+```bash
+DEFAULT_REGION=EU
+EU_DB_URL=sqlite://eu.sqlite
+US_DB_URL=sqlite://us.sqlite
+DB_TYPE_EU=sqlite
+DB_TYPE_US=sqlite
+```
+
+Tenant example:
+
+```json
+{
+  "region": "EU",
+  "strictDataResidency": true
+}
+```
+
+When a policy violation occurs, the API returns:
+
+```text
+403 Forbidden
+Tenant data residency policy prohibits access outside the configured region.
+```
+
+For local development, the routing service initializes SQLite-backed regional datasources so tests and simulations can verify region selection without a full multi-database deployment.
+
 | Section            | Variables                                                      |
 |--------------------|----------------------------------------------------------------|
 | Core               | `NODE_ENV`, `PORT`, `APP_URL`, `APP_DOMAIN`                   |

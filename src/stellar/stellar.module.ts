@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
 import { ConfigModule } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { StellarController } from './controllers/stellar.controller';
 import { StellarFeeService } from './services/stellar-fee.service';
 import { StellarCacheService } from './services/stellar-cache.service';
@@ -19,6 +21,8 @@ import { MetricsModule } from '../metrics/metrics.module';
     ConfigModule,
     CircuitBreakerModule,
     MetricsModule,
+    TypeOrmModule.forFeature([HttpIdempotencyEntity]),
+    EventEmitterModule.forRoot(),
     HttpModule.register({
       timeout: 10000,
       maxRedirects: 5,
@@ -35,6 +39,7 @@ import { MetricsModule } from '../metrics/metrics.module';
     StellarRetryStoreService,
     StellarTransactionQueueService,
     StellarRecoveryManagerService,
+    StellarPaymentVerificationService,
   ],
   exports: [
     StellarFeeService,
@@ -44,6 +49,7 @@ import { MetricsModule } from '../metrics/metrics.module';
     StellarTransactionRetryService,
     StellarTransactionQueueService,
     StellarRecoveryManagerService,
+    StellarPaymentVerificationService,
   ],
 })
 export class StellarModule {}
