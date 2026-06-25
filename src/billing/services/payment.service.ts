@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, FindOptionsWhere, Between } from 'typeorm';
 import { Payment } from '../entities/payment.entity';
@@ -12,9 +12,12 @@ import {
 } from '../dto/payment.dto';
 import { PaymentStatus, PaymentMethod } from '../../common/enums';
 import { v4 as uuidv4 } from 'uuid';
+import { InvoicePdfService } from './invoice-pdf.service';
 
 @Injectable()
 export class PaymentService {
+  private readonly logger = new Logger(PaymentService.name);
+
   constructor(
     @InjectRepository(Payment)
     private readonly paymentRepository: Repository<Payment>,
@@ -22,6 +25,7 @@ export class PaymentService {
     private readonly billingRepository: Repository<Billing>,
     @InjectRepository(BillingLineItem)
     private readonly lineItemRepository: Repository<BillingLineItem>,
+    private readonly invoicePdfService: InvoicePdfService,
   ) {}
 
   async create(createDto: CreatePaymentDto): Promise<Payment> {
@@ -129,6 +133,16 @@ export class PaymentService {
       payment.status = PaymentStatus.COMPLETED;
       payment.postedDate = new Date();
       await this.paymentRepository.save(payment);
+
+      // Emit a patient-facing invoice PDF email once the payment is confirmed.
+      // Best-effort: failures here must not roll back a successful payment.
+      this.invoicePdfService.sendInvoiceEmail(payment.billingId).catch((error) => {
+        this.logger.warn(
+          `Failed to send invoice email for billing ${payment.billingId}: ${
+            error instanceof Error ? error.message : 'Unknown error'
+          }`,
+        );
+      });
 
       return payment;
     } catch (error) {

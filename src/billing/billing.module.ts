@@ -22,6 +22,7 @@ import {
   PaymentService,
   DenialService,
   ReportService,
+  InvoicePdfService,
 } from './services';
 
 import {
@@ -68,6 +69,7 @@ import {
     PaymentService,
     DenialService,
     ReportService,
+    InvoicePdfService,
   ],
   exports: [
     MedicalCodeService,
@@ -77,6 +79,7 @@ import {
     PaymentService,
     DenialService,
     ReportService,
+    InvoicePdfService,
   ],
 })
 export class BillingModule {}
