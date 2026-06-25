@@ -7,6 +7,7 @@ import { MedicalHistory, HistoryEventType } from '../entities/medical-history.en
 import { CreateMedicalRecordDto } from '../dto/create-medical-record.dto';
 import { UpdateMedicalRecordDto } from '../dto/update-medical-record.dto';
 import { SearchMedicalRecordsDto } from '../dto/search-medical-records.dto';
+import { FullTextSearchDto } from '../dto/full-text-search.dto';
 import { AccessControlService } from '../../access-control/services/access-control.service';
 import { AuditLogService } from '../../common/services/audit-log.service';
 import { ProviderPatientRelationshipService } from '../../provider-patient/services/provider-patient-relationship.service';
@@ -272,6 +273,127 @@ export class MedicalRecordsService {
       total,
       page,
       limit: pageSizeValue,
+    };
+  }
+
+  /**
+   * Full-text search across medical records with relevance ranking.
+   *
+   * Uses PostgreSQL's built-in `ts_rank` on the `search_vector` column
+   * which is maintained via a DB trigger (see migration
+   * `AddMedicalRecordFullTextSearch1746500000000`).
+   *
+   * Search query syntax (via `websearch_to_tsquery`):
+   *  - Plain words:  `hypertension` → matches documents containing "hypertension"
+   *  - Multiple terms: `hypertension diabetes` → matches documents containing both
+   *  - Phrase search: `"chronic kidney disease"` → exact phrase match
+   *  - Proximity: `diabetes <-> hypertension` → terms adjacent (PG native syntax)
+   *  - AND/OR: `hypertension OR diabetes` → logical operators
+   *
+   * Results are ordered by `ts_rank` descending (most relevant first).
+   * Additional filters (patientId, recordType, status, dateRange) narrow
+   * the result set while preserving relevance ranking.
+   */
+  async searchFulltext(
+    searchDto: FullTextSearchDto,
+    organizationId?: string,
+  ): Promise<{
+    data: MedicalRecord[];
+    total: number;
+    page: number;
+    limit: number;
+    relevance: Record<string, number>;
+  }> {
+    if (!organizationId) throw new BadRequestException('organizationId is required');
+    if (!searchDto.q || searchDto.q.trim().length === 0) {
+      throw new BadRequestException('Search query "q" is required');
+    }
+
+    const {
+      q,
+      patientId,
+      recordType,
+      status,
+      startDate,
+      endDate,
+      page = 1,
+      limit = 20,
+    } = searchDto;
+
+    // Build the tsquery from the user's search string using websearch_to_tsquery
+    // which supports: plain terms, AND/OR, phrase (double-quoted), and proximity
+    const tsQuery = `websearch_to_tsquery('english', :q)`;
+
+    // Base query: select records with full-text relevance
+    const queryBuilder = this.medicalRecordRepository
+      .createQueryBuilder('record')
+      .addSelect(
+        `ts_rank(record.search_vector, ${tsQuery})`,
+        'relevance',
+      )
+      .where(`${tsQuery} @@ record.search_vector`)
+      .andWhere('record.organizationId = :organizationId', { organizationId })
+      .setParameter('q', q);
+
+    // Optional filters
+    if (patientId) {
+      queryBuilder.andWhere('record.patientId = :patientId', { patientId });
+    }
+
+    if (recordType) {
+      queryBuilder.andWhere('record.recordType = :recordType', { recordType });
+    }
+
+    if (status) {
+      queryBuilder.andWhere('record.status = :status', { status });
+    }
+
+    if (startDate || endDate) {
+      if (startDate && endDate) {
+        queryBuilder.andWhere('record.recordDate BETWEEN :startDate AND :endDate', {
+          startDate,
+          endDate,
+        });
+      } else if (startDate) {
+        queryBuilder.andWhere('record.recordDate >= :startDate', { startDate });
+      } else if (endDate) {
+        queryBuilder.andWhere('record.recordDate <= :endDate', { endDate });
+      }
+    }
+
+    // Count total results (without pagination)
+    const total = await queryBuilder.getCount();
+
+    // Order by relevance (highest first), then by recency as tiebreaker
+    queryBuilder
+      .orderBy('relevance', 'DESC')
+      .addOrderBy('record.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    // Use getRawAndEntities to retrieve both the entity data and the computed
+    // 'relevance' column (ts_rank score) in a single query
+    const rawAndEntities = await queryBuilder.getRawAndEntities();
+    const data = rawAndEntities.entities;
+    const relevance: Record<string, number> = {};
+    for (const raw of rawAndEntities.raw) {
+      // The raw result alias depends on the query builder — TypeORM prefixes
+      // with the alias ('record_') for the id column
+      const idKey = Object.keys(raw).find(
+        (k) => k.endsWith('_id') && raw[k] !== null,
+      );
+      const recordId = idKey ? raw[idKey] : raw.id;
+      if (recordId && raw.relevance !== undefined) {
+        relevance[recordId] = parseFloat(raw.relevance) || 0;
+      }
+    }
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      relevance,
     };
   }
 

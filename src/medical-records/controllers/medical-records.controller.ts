@@ -17,6 +17,7 @@ import { MedicalRecordsService } from '../services/medical-records.service';
 import { CreateMedicalRecordDto } from '../dto/create-medical-record.dto';
 import { UpdateMedicalRecordDto } from '../dto/update-medical-record.dto';
 import { SearchMedicalRecordsDto } from '../dto/search-medical-records.dto';
+import { FullTextSearchDto } from '../dto/full-text-search.dto';
 import { AuditInterceptor } from '../../common/audit/audit.interceptor';
 import { CurrentTenant } from '@/tenant';
 import { CurrentUser } from '../../common/decorators/audit-context.decorator';
@@ -52,6 +53,28 @@ export class MedicalRecordsController {
     @CurrentTenant('tenantId') tenantId: string,
   ) {
     return this.medicalRecordsService.search(searchDto, tenantId);
+  }
+
+  @Get('search/fulltext')
+  @ApiOperation({
+    summary: 'Full-text search with relevance ranking',
+    description:
+      'Searches medical records using PostgreSQL full-text search with ' +
+      'ts_rank relevance ordering. Supports phrase search (double-quoted), ' +
+      'AND/OR operators, and proximity operators.',
+  })
+  @ApiResponse({ status: 200, description: 'Full-text search results ordered by relevance' })
+  @ApiQuery({
+    name: 'q',
+    required: true,
+    description: 'Full-text search query',
+    example: 'hypertension diabetes',
+  })
+  async searchFulltext(
+    @Query() searchDto: FullTextSearchDto,
+    @CurrentTenant('tenantId') tenantId: string,
+  ) {
+    return this.medicalRecordsService.searchFulltext(searchDto, tenantId);
   }
 
   @Get('timeline/:patientId')

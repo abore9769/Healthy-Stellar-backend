@@ -28,6 +28,7 @@ import { ClinicalNotesService } from './services/clinical-notes.service';
 
 import { MedicalRecordsController } from './controllers/medical-records.controller';
 import { ClinicalTemplatesController } from './controllers/clinical-templates.controller';
+import { MedicalRecordSearchSubscriber } from './subscribers/medical-record-search.subscriber';
 import { ConsentController } from './controllers/consent.controller';
 import { FileUploadController } from './controllers/file-upload.controller';
 import { ReportingController } from './controllers/reporting.controller';
@@ -78,6 +79,7 @@ import { Patient } from '../patients/entities/patient.entity';
     EmailService,
     ClinicalNotesService,
     ReportProcessor,
+    MedicalRecordSearchSubscriber,
   ],
   exports: [
     MedicalRecordsService,
