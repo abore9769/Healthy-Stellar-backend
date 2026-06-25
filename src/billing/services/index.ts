@@ -5,3 +5,4 @@ export * from './claim.service';
 export * from './payment.service';
 export * from './denial.service';
 export * from './report.service';
+export * from './invoice-pdf.service';
