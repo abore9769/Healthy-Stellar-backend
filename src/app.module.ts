@@ -49,6 +49,7 @@ import { TenantInterceptor } from './tenant/interceptors/tenant.interceptor';
 import { DataResidencyInterceptor } from './common/interceptors/data-residency.interceptor';
 import { JobsModule } from './jobs/jobs.module';
 import { DataRetentionModule } from './data-retention/data-retention.module';
+import { DataResidencyModule } from './data-residency/data-residency.module';
 import { GraphqlModule } from './graphql/graphql.module';
 import { VersioningModule } from './versioning/versioning.module';
 import { LedgerReconciliationModule } from './ledger-reconciliation/ledger-reconciliation.module';
@@ -138,6 +139,7 @@ import { PiiRedactionInterceptor } from './common/interceptors/pii-redaction.int
     TenantConfigModule,
     AnalyticsModule,
     GdprModule,
+    DataResidencyModule,
     ResearchExportModule,
     ReconciliationModule,
     GraphqlModule,
