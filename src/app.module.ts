@@ -158,7 +158,7 @@ import { SessionRecordingModule } from './telemedicine-and-remote/src/session-re
     DlqModule,
     OperatorRunbookModule,
     IncidentModule,
-    SessionRecordingModule,
+    EhrImportModule,
     EventEmitterModule.forRoot(),
   ],
   controllers: [AppController],
