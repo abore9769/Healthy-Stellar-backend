@@ -24,7 +24,7 @@ Extended `RecordAttachment` entity with digital signature metadata columns:
 | `signatureMetadata` | `text \| null` | JSON blob with ByteRange, error details, etc. |
 
 #### 2. `src/records/services/digital-signature.service.ts`
-Core verification service (~568 lines):
+Core verification service (~580 lines):
 
 - **`extractPdfSignature(buffer)`** — Parses PDF structure to find signature fields (`/Type /Sig`), extracts:
   - PKCS#7 / CAdES signature blob (`/Contents`)
@@ -33,10 +33,9 @@ Core verification service (~568 lines):
   - Signing time
   - Digest algorithm
 
-- **`verifyPdfSignature(buffer, publicKeyPem)`** — Verifies a PDF's digital signature:
-  1. Extracts signature metadata
-  2. Reconstructs signed data using ByteRange
-  3. Verifies against stored public key using OpenSSL CMS
+- **`isValidPdfSignatureStructure(buffer)`** — Lightweight structural validation (parseable PKCS#7, valid ByteRange) used during upload
+
+- **`verifyPdfSignature(buffer, publicKeyPem)`** — Full cryptographic verification against stored public key using OpenSSL CMS + Node.js crypto
 
 - **`verifyDetachedSignature(signatureBytes, data, publicKeyPem)`** — For non-PDF or separately stored signatures
 
@@ -50,18 +49,23 @@ Alerting and audit service (~94 lines):
 - Listens for events to notify records department
 
 #### 4. `src/records/services/record-attachment-upload.service.ts`
-Enhanced upload flow with signature extraction:
+Enhanced upload flow with signature metadata extraction:
 
 ```
 Step 1: Validate record exists
 Step 2: Validate file (MIME, size, magic bytes)
-Step 2b: Extract & verify digital signature (NEW)
+Step 2b: Extract signature metadata + structural validation (NEW)
+         • hasPdfSignature() → check for /Type /Sig field
+         • extractPdfSignature() → parse PKCS#7, ByteRange, cert
+         • isValidPdfSignatureStructure() → validate structure without public key
 Step 3: Encrypt file using patient's KEK
 Step 4: Upload encrypted bytes to IPFS
 Step 5: Save attachment metadata + signature fields
-Step 5b: Trigger alert if INVALID signature
+Step 5b: Trigger alert if INVALID signature structure
 Step 6: Log audit entry
 ```
+
+Full cryptographic verification happens on retrieval (Step 2b) where the stored public key is available.
 
 #### 5. `src/records/controllers/records.controller.ts`
 New endpoint:
