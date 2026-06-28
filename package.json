@@ -67,6 +67,7 @@
     "check:contract-types": "node scripts/check-contract-types.js",
     "check:sdk-drift": "node scripts/check-sdk-drift.js",
     "export:schema": "ts-node -r tsconfig-paths/register scripts/export-schema.ts",
+    "register:graphql-queries": "ts-node -r tsconfig-paths/register scripts/register-graphql-queries.ts",
     "version:sdk": "node scripts/version-sdk.js",
     "publish:sdk": "bash scripts/publish-sdk.sh",
     "docs:generate": "ts-node -r tsconfig-paths/register 'src/swaggeropenapi-documentation-with-full-schema-coverage/export-openapi.ts'",
