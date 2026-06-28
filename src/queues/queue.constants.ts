@@ -8,6 +8,7 @@ export const QUEUE_NAMES = {
   REPORTS: 'reports',
   EHR_IMPORT: 'ehr-import',
   WEBHOOK_DELIVERY: 'webhook-delivery',
+  COMPLIANCE_REPORTS: 'compliance-reports',
 } as const;
 
 export const JOB_TYPES = {

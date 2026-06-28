@@ -71,6 +71,7 @@ import { EventStoreModule } from './event-store/event-store.module';
 import { BullBoardAuthMiddleware } from './queues/middleware/bull-board-auth.middleware';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { WebhooksModule } from './webhooks/webhooks.module';
+import { GovernanceAnalyticsModule } from './governance-analytics/governance-analytics.module';
 import { IdempotencyModule } from './idempotency/idempotency.module';
 import { IdempotencyInterceptor } from './idempotency/idempotency.interceptor';
 import { DlqModule } from './dlq/dlq.module';
@@ -154,6 +155,7 @@ import { SessionRecordingModule } from './telemedicine-and-remote/src/session-re
     ProviderPatientModule,
     ConsistencyCheckerModule,
     WebhooksModule,
+    GovernanceAnalyticsModule,
     IdempotencyModule,
     DlqModule,
     OperatorRunbookModule,
