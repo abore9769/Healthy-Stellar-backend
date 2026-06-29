@@ -96,7 +96,7 @@ export class QueueModule {
           { name: QUEUE_NAMES.EMAIL_NOTIFICATIONS },
           { name: QUEUE_NAMES.REPORTS },
           { name: QUEUE_NAMES.EHR_IMPORT },
-          { name: QUEUE_NAMES.PANIC_ALERTS },
+          { name: QUEUE_NAMES.USER_CSV_IMPORT },
         ),
 
         // Bull Board dashboard — only useful when the HTTP server is running.
